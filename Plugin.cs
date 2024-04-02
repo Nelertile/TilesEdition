@@ -13,6 +13,7 @@ using TilesEdition.Utils;
 using UnityEngine;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
+using TMPro;
 
 namespace TilesEdition
 {
@@ -78,6 +79,16 @@ namespace TilesEdition
                 {
                     mainLogo.gameObject.GetComponent<Image>().sprite = logoImage;
                 }
+                Transform loadingScreen = parent.transform.Find("MenuContainer/LoadingScreen");
+                if (loadingScreen != null)
+                {
+                    loadingScreen.localScale = new Vector3(1.02f, 1.06f, 1.02f);
+                    Transform loadingLogo = loadingScreen.Find("Image");
+                    if (loadingLogo != null)
+                    {
+                        loadingLogo.GetComponent<Image>().sprite = logoImage;
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -85,5 +96,33 @@ namespace TilesEdition
             }
         }
     }
+
+    [HarmonyPatch(typeof(HUDManager), "Update")]
+    public static class HUDManagerWeightFormatPatch
+    {
+        [HarmonyPostfix]
+        private static void SetClock(ref TextMeshProUGUI ___weightCounter, ref Animator ___weightCounterAnimator)
+        {
+            float num = Mathf.RoundToInt(Mathf.Clamp((GameNetworkManager.Instance.localPlayerController.carryWeight - 1f) * 0.4535f, 0f, 100f) * 105f);
+            float num2 = Mathf.RoundToInt(Mathf.Clamp(GameNetworkManager.Instance.localPlayerController.carryWeight - 1f, 0f, 100f) * 105f);
+            ((TMP_Text)___weightCounter).text = $"{num} kg";
+            ___weightCounterAnimator.SetFloat("weight", num2 / 130f);
+        }
+    }
+
+    [HarmonyPatch(typeof(HUDManager), "SetClock")]
+    public static class HUDManagerClockFormatPatch
+    {
+        [HarmonyPrefix]
+        private static bool SetClock(ref TextMeshProUGUI ___clockNumber, ref float timeNormalized, ref float numberOfHours)
+        {
+            int num = (int)(timeNormalized * (60f * numberOfHours)) + 360;
+            int num2 = (int)Mathf.Floor((float)(num / 60));
+            int num3 = num % 60;
+            ((TMP_Text)___clockNumber).text = $"{num2:00}:{num3:00}".TrimStart(new char[1] { '0' });
+            return false;
+        }
+    }
+
 }
 
