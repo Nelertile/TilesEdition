@@ -24,12 +24,17 @@ namespace TilesEdition
         public const string PLUGIN_GUID = "io.github.nelertile.TilesEdition";
     }
 
+
+
     [BepInPlugin(PluginInformation.PLUGIN_GUID, PluginInformation.PLUGIN_NAME, PluginInformation.PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin
     {
         private readonly Harmony harmony = new Harmony(PluginInformation.PLUGIN_GUID);
 
         private static Plugin Instance;
+        public static ConfigEntry<bool> configDisplayCustomMainMenuLogo;
+        public static ConfigEntry<bool> configReformatWeight;
+        public static ConfigEntry<bool> configReformatTime;
         public static AssetBundle assets;
 
         public static ManualLogSource Log;
@@ -41,6 +46,7 @@ namespace TilesEdition
             if (Instance == null) Instance = this;
 
             Log = base.Logger;
+            InitConfig();
 
             // Plugin startup logic
             try
@@ -61,6 +67,30 @@ namespace TilesEdition
 
             Log.LogInfo($"Plugin {PluginInformation.PLUGIN_GUID} is loaded!");
         }
+
+        private void InitConfig()
+        {
+            configDisplayCustomMainMenuLogo = Config.Bind(
+                "General",
+                "DisplayCustomMainMenuLogo",
+                true,
+                "Toggle main menu logo changes"
+            );
+
+            configReformatWeight = Config.Bind(
+                "General.Reformat",
+                "ReformatWeight",
+                true,
+                "Toggle weight reformatting"
+            );
+
+            configReformatTime = Config.Bind(
+                "General.Reformat",
+                "ReformatTime",
+                true,
+                "Toggle time reformatting"
+            );
+        }
     }
 
     [HarmonyPatch(typeof(MenuManager), "Awake")]
@@ -68,32 +98,36 @@ namespace TilesEdition
     {
         public static void Postfix(MenuManager __instance)
         {
-            try
+            if (Plugin.configDisplayCustomMainMenuLogo.Value)
             {
-                GameObject parent = __instance.transform.parent.gameObject;
-
-                Sprite logoImage = Sprite.Create(Plugin.mainLogo, new Rect(0, 0, Plugin.mainLogo.width, Plugin.mainLogo.height), new Vector2(0.5f, 0.5f));
-
-                Transform mainLogo = parent.transform.Find("MenuContainer/MainButtons/HeaderImage");
-                if (mainLogo != null)
+                try
                 {
-                    mainLogo.gameObject.GetComponent<Image>().sprite = logoImage;
-                }
-                Transform loadingScreen = parent.transform.Find("MenuContainer/LoadingScreen");
-                if (loadingScreen != null)
-                {
-                    loadingScreen.localScale = new Vector3(1.02f, 1.06f, 1.02f);
-                    Transform loadingLogo = loadingScreen.Find("Image");
-                    if (loadingLogo != null)
+                    GameObject parent = __instance.transform.parent.gameObject;
+
+                    Sprite logoImage = Sprite.Create(Plugin.mainLogo, new Rect(0, 0, Plugin.mainLogo.width, Plugin.mainLogo.height), new Vector2(0.5f, 0.5f));
+
+                    Transform mainLogo = parent.transform.Find("MenuContainer/MainButtons/HeaderImage");
+                    if (mainLogo != null)
                     {
-                        loadingLogo.GetComponent<Image>().sprite = logoImage;
+                        mainLogo.gameObject.GetComponent<Image>().sprite = logoImage;
+                    }
+                    Transform loadingScreen = parent.transform.Find("MenuContainer/LoadingScreen");
+                    if (loadingScreen != null)
+                    {
+                        loadingScreen.localScale = new Vector3(1.02f, 1.06f, 1.02f);
+                        Transform loadingLogo = loadingScreen.Find("Image");
+                        if (loadingLogo != null)
+                        {
+                            loadingLogo.GetComponent<Image>().sprite = logoImage;
+                        }
                     }
                 }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogError(e);
+                }
             }
-            catch (Exception e)
-            {
-                Plugin.Log.LogError(e);
-            }
+
         }
     }
 
@@ -103,10 +137,13 @@ namespace TilesEdition
         [HarmonyPostfix]
         private static void SetClock(ref TextMeshProUGUI ___weightCounter, ref Animator ___weightCounterAnimator)
         {
-            float num = Mathf.RoundToInt(Mathf.Clamp((GameNetworkManager.Instance.localPlayerController.carryWeight - 1f) * 0.4535f, 0f, 100f) * 105f);
-            float num2 = Mathf.RoundToInt(Mathf.Clamp(GameNetworkManager.Instance.localPlayerController.carryWeight - 1f, 0f, 100f) * 105f);
-            ((TMP_Text)___weightCounter).text = $"{num} kg";
-            ___weightCounterAnimator.SetFloat("weight", num2 / 130f);
+            if (Plugin.configReformatWeight.Value)
+            {
+                float num = Mathf.RoundToInt(Mathf.Clamp((GameNetworkManager.Instance.localPlayerController.carryWeight - 1f) * 0.4535f, 0f, 100f) * 105f);
+                float num2 = Mathf.RoundToInt(Mathf.Clamp(GameNetworkManager.Instance.localPlayerController.carryWeight - 1f, 0f, 100f) * 105f);
+                ((TMP_Text)___weightCounter).text = $"{num} kg";
+                ___weightCounterAnimator.SetFloat("weight", num2 / 130f);
+            }
         }
     }
 
@@ -116,11 +153,15 @@ namespace TilesEdition
         [HarmonyPrefix]
         private static bool SetClock(ref TextMeshProUGUI ___clockNumber, ref float timeNormalized, ref float numberOfHours)
         {
-            int num = (int)(timeNormalized * (60f * numberOfHours)) + 360;
-            int num2 = (int)Mathf.Floor((float)(num / 60));
-            int num3 = num % 60;
-            ((TMP_Text)___clockNumber).text = $"{num2:00}:{num3:00}".TrimStart(new char[1] { '0' });
-            return false;
+            if (Plugin.configReformatTime.Value)
+            {
+                int num = (int)(timeNormalized * (60f * numberOfHours)) + 360;
+                int num2 = (int)Mathf.Floor((float)(num / 60));
+                int num3 = num % 60;
+                ((TMP_Text)___clockNumber).text = $"{num2:00}:{num3:00}".TrimStart(new char[1] { '0' });
+                return false;
+            }
+            return true;
         }
     }
 
